@@ -1,76 +1,54 @@
 import cv2
 import os
+import string
 
-# Set up the folder path based on our earlier structure
-SAVE_DIR = "data/images"
-os.makedirs(SAVE_DIR, exist_ok=True)
+def get_next_filename(letter):
+    for i in range(1, 11):
+        filename = f"data/images/{letter}_{i:02d}.jpg"
+        if not os.path.exists(filename):
+            return filename
+    return None
 
-def capture_images():
-    # Ask which letter you want to record
-    letter = input("\nEnter the letter you are capturing (A-Z) or type 'quit' to exit: ").upper()
-    
-    if letter == 'QUIT':
-        return False
-
-    # Open the default webcam
+def capture_location_round():
+    os.makedirs("data/images", exist_ok=True)
+    os.makedirs("data/annotations", exist_ok=True)
     cap = cv2.VideoCapture(0)
     
-    if not cap.isOpened():
-        print("Error: Could not open webcam.")
-        return False
-
-    print(f"\n--- Ready to capture: {letter} ---")
-    print("Press SPACEBAR to snap a photo.")
-    print("Press 'q' if you need to quit early.")
-
-    count = 1
-    # Loop until we get the 10 required images for this letter
-    while count <= 10: 
-        ret, frame = cap.read()
-        if not ret:
-            print("Failed to grab frame from camera.")
-            break
-
-        # Make a copy of the frame to draw text on (so the saved image stays clean)
-        display_frame = frame.copy()
-        
-        # Show on-screen instructions
-        cv2.putText(display_frame, f"Letter: {letter} | Captured: {count-1}/10", 
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(display_frame, "Press SPACEBAR to capture, 'q' to quit", 
-                    (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        
-        # Display the live feed
-        cv2.imshow("Dataset Collector", display_frame)
-
-        # Wait for key press
-        key = cv2.waitKey(1) & 0xFF
-        
-        if key == 32:  # Spacebar key code
-            # Format the filename: e.g., A_01.jpg, A_02.jpg
-            filename = os.path.join(SAVE_DIR, f"{letter}_{count:02d}.jpg")
+    for letter in string.ascii_uppercase:
+        filename = get_next_filename(letter)
+        if not filename:
+            continue
             
-            # Save the clean frame (without the text)
-            cv2.imwrite(filename, frame) 
-            print(f"Saved: {filename}")
-            count += 1
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+                
+            display_frame = frame.copy()
+            cv2.putText(display_frame, f"Letter: {letter}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(display_frame, "SPACE: capture | S: skip | Q: quit", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            cv2.imshow("Capture", display_frame)
             
-        elif key == ord('q'):  # 'q' key code
-            break
-            
-    # Clean up and close the camera for this round
+            key = cv2.waitKey(1) & 0xFF
+            if key == 32:
+                cv2.imwrite(filename, frame)
+                print(f"Saved {filename}")
+                break
+            elif key == ord('s') or key == ord('S'):
+                break
+            elif key == ord('q') or key == ord('Q'):
+                cap.release()
+                cv2.destroyAllWindows()
+                return False
+                
     cap.release()
     cv2.destroyAllWindows()
-    
-    if count > 10:
-        print(f"Awesome! You got all 10 images for '{letter}'.")
-        
     return True
 
 if __name__ == "__main__":
-    print("Starting Dataset Collector...")
-    # Keep running until the user types 'quit'
     while True:
-        if not capture_images():
+        start = input("Start new location round for A-Z? (y/n): ")
+        if start.lower() != 'y':
             break
-    print("Data collection complete! Time to annotate.")
+        if not capture_location_round():
+            break
