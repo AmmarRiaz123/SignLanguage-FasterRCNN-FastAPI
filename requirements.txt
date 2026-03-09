@@ -1,0 +1,90 @@
+# ==========================================
+# Sign Language Detection - Requirements
+# ==========================================
+# Core PyTorch and TorchVision for model training and inference
+# Use the appropriate CUDA version for your GPU if available
+# Install PyTorch first: https://pytorch.org/get-started/locally/
+
+# Deep Learning Framework
+torch>=2.0.0
+torchvision>=0.15.0
+torchmetrics>=1.0.0
+
+# Web Framework
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+
+# Computer Vision
+opencv-python>=4.8.0
+opencv-python-headless>=4.8.0  # Alternative for headless servers
+
+# Image Processing
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# XML Parsing (included in Python stdlib, but listed for clarity)
+# xml.etree.ElementTree is built-in
+
+# Data Processing
+pandas>=2.0.0  # Optional: for dataset analysis
+
+# Progress Bars (optional but helpful for training)
+tqdm>=4.65.0
+
+# Jupyter Notebook Support
+jupyter>=1.0.0
+ipykernel>=6.25.0
+ipywidgets>=8.1.0  # For interactive widgets in notebooks
+
+# Type Hints (Python 3.8+)
+typing-extensions>=4.7.0
+
+# ==========================================
+# Development Dependencies (Optional)
+# ==========================================
+# Uncomment if needed for development
+
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# black>=23.7.0
+# flake8>=6.1.0
+# mypy>=1.5.0
+
+# ==========================================
+# Production Dependencies (Optional)
+# ==========================================
+# Uncomment for production deployment
+
+# gunicorn>=21.2.0
+# python-multipart>=0.0.6  # For file uploads
+# aiofiles>=23.2.0  # For async file operations
+
+# ==========================================
+# Installation Instructions
+# ==========================================
+# 
+# 1. Create a virtual environment:
+#    python -m venv venv
+#    
+# 2. Activate the environment:
+#    Windows: venv\Scripts\activate
+#    Linux/Mac: source venv/bin/activate
+#    
+# 3. Install PyTorch with CUDA (if you have a GPU):
+#    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+#    
+#    Or CPU-only:
+#    pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#    
+# 4. Install remaining requirements:
+#    pip install -r requirements.txt
+#    
+# 5. Run Jupyter Notebook:
+#    jupyter notebook model_pipeline.ipynb
+#    
+# 6. Run FastAPI server:
+#    python app.py
+#    Or: uvicorn app:app --reload --host 0.0.0.0 --port 8000
