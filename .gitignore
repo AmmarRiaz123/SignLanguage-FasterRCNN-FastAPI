@@ -56,7 +56,6 @@ ipython_config.py
 # ==========================================
 # Model checkpoints and weights
 checkpoints/
-*.pth
 *.pt
 *.ckpt
 *.h5
