@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 from PIL import Image
 import torchvision.transforms.v2 as T
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from fastapi import FastAPI, Request, Response
@@ -36,7 +36,7 @@ import uvicorn
 # ==========================================
 # Configuration
 # ==========================================
-MODEL_PATH = "./model_deployment.pth"  # Path to trained model
+MODEL_PATH = "./faster_rcnn_model.pth"  # Path to trained model
 CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for detection
 WORD_BUILDER_THRESHOLD = 0.7  # Higher threshold for word building
 WORD_BUILDER_FRAMES = 15  # Number of consecutive frames to confirm a letter
@@ -63,8 +63,8 @@ def create_model(num_classes: int = 27) -> nn.Module:
     Returns:
         Faster R-CNN model
     """
-    # Load pre-trained model structure
-    model = fasterrcnn_resnet50_fpn(weights=None)
+    # Load pre-trained model structure (must match training architecture)
+    model = fasterrcnn_resnet50_fpn_v2(weights=None)
     
     # Modify the box predictor for our classes
     in_features = model.roi_heads.box_predictor.cls_score.in_features
