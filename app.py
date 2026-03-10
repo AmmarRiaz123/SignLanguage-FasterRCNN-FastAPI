@@ -37,7 +37,7 @@ import uvicorn
 # Configuration
 # ==========================================
 MODEL_PATH = "./faster_rcnn_model.pth"  # Path to trained model
-CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for detection
+CONFIDENCE_THRESHOLD = 0.65  # Minimum confidence for detection (raised for low mAP model)
 WORD_BUILDER_THRESHOLD = 0.7  # Higher threshold for word building
 WORD_BUILDER_FRAMES = 15  # Number of consecutive frames to confirm a letter
 CAMERA_INDEX = 0  # Webcam index (usually 0 for default camera)
@@ -118,13 +118,19 @@ model = load_model(MODEL_PATH, DEVICE)
 # ==========================================
 # Inference Functions
 # ==========================================
+# ImageNet normalization (MUST match training preprocessing)
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
+INPUT_SIZE = (600, 600)  # Must match training resize
+
+
 @torch.no_grad()
 def run_inference(
     model: nn.Module,
     frame: np.ndarray,
     device: torch.device,
     confidence_threshold: float = 0.5
-) -> Tuple[np.ndarray, List[Dict]]:
+) -> List[Dict]:
     """
     Run Faster R-CNN inference on a single frame.
     
@@ -135,15 +141,23 @@ def run_inference(
         confidence_threshold: Minimum confidence to keep detections
         
     Returns:
-        Tuple of (annotated frame, list of detections)
+        List of detections with boxes scaled back to original frame size
     """
+    orig_h, orig_w = frame.shape[:2]
+    
     # Convert BGR (OpenCV) to RGB
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
-    # Convert to PIL Image and then to tensor
-    pil_image = Image.fromarray(rgb_frame)
-    image_tensor = T.functional.to_image(pil_image)
-    image_tensor = T.functional.to_dtype(image_tensor, dtype=torch.float32, scale=True)
+    # Resize to match training input size (600x600)
+    resized_frame = cv2.resize(rgb_frame, INPUT_SIZE)
+    
+    # Convert to tensor and normalize (matching training preprocessing exactly)
+    image_tensor = torch.from_numpy(resized_frame).permute(2, 0, 1).float() / 255.0
+    
+    # Apply ImageNet normalization (critical - must match training!)
+    for c in range(3):
+        image_tensor[c] = (image_tensor[c] - IMAGENET_MEAN[c]) / IMAGENET_STD[c]
+    
     image_tensor = image_tensor.to(device)
     
     # Run inference
@@ -153,6 +167,10 @@ def run_inference(
     # Filter predictions by confidence
     keep = pred["scores"] >= confidence_threshold
     
+    # Scale factors to map boxes from 600x600 back to original frame size
+    scale_x = orig_w / INPUT_SIZE[0]
+    scale_y = orig_h / INPUT_SIZE[1]
+    
     detections = []
     for i in range(keep.sum().item()):
         idx = torch.where(keep)[0][i]
@@ -160,13 +178,25 @@ def run_inference(
         label = pred["labels"][idx].item()
         score = pred["scores"][idx].item()
         
+        # Scale box coordinates back to original frame size
+        scaled_box = [
+            box[0] * scale_x,  # x1
+            box[1] * scale_y,  # y1
+            box[2] * scale_x,  # x2
+            box[3] * scale_y,  # y2
+        ]
+        
         detection = {
-            "box": box.tolist(),  # [x1, y1, x2, y2]
+            "box": scaled_box,
             "label": label,
             "class_name": IDX_TO_CLASS.get(label, f"Class {label}"),
             "score": score
         }
         detections.append(detection)
+        
+        # Limit to top 5 detections to avoid clutter
+        if len(detections) >= 5:
+            break
     
     return detections
 
