@@ -37,8 +37,8 @@ import uvicorn
 # Configuration
 # ==========================================
 MODEL_PATH = "./faster_rcnn_model.pth"  # Path to trained model
-CONFIDENCE_THRESHOLD = 0.65  # Minimum confidence for detection (raised for low mAP model)
-WORD_BUILDER_THRESHOLD = 0.7  # Higher threshold for word building
+CONFIDENCE_THRESHOLD = 0.3  # Lower threshold to see detections (tune based on results)
+WORD_BUILDER_THRESHOLD = 0.5  # Threshold for word building
 WORD_BUILDER_FRAMES = 15  # Number of consecutive frames to confirm a letter
 CAMERA_INDEX = 0  # Webcam index (usually 0 for default camera)
 FRAME_WIDTH = 640
@@ -163,6 +163,12 @@ def run_inference(
     # Run inference
     predictions = model([image_tensor])
     pred = predictions[0]
+    
+    # Debug: print raw prediction stats
+    num_raw = len(pred["scores"])
+    if num_raw > 0:
+        max_score = pred["scores"].max().item()
+        print(f"[DEBUG] Raw predictions: {num_raw}, max score: {max_score:.3f}, threshold: {confidence_threshold}")
     
     # Filter predictions by confidence
     keep = pred["scores"] >= confidence_threshold
