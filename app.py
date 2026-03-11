@@ -37,7 +37,7 @@ import uvicorn
 # Configuration
 # ==========================================
 MODEL_PATH = "./faster_rcnn_model.pth"  # Path to trained model
-CONFIDENCE_THRESHOLD = 0.3  # Lower threshold to see detections (tune based on results)
+CONFIDENCE_THRESHOLD = 0.4  # Detection threshold (increase if too many false positives)
 WORD_BUILDER_THRESHOLD = 0.5  # Threshold for word building
 WORD_BUILDER_FRAMES = 15  # Number of consecutive frames to confirm a letter
 CAMERA_INDEX = 0  # Webcam index (usually 0 for default camera)
@@ -173,36 +173,44 @@ def run_inference(
     # Filter predictions by confidence
     keep = pred["scores"] >= confidence_threshold
     
+    if keep.sum().item() == 0:
+        return []  # No detections above threshold
+    
+    # Get indices of kept predictions and sort by score (descending)
+    kept_indices = torch.where(keep)[0]
+    kept_scores = pred["scores"][kept_indices]
+    sorted_order = torch.argsort(kept_scores, descending=True)
+    
     # Scale factors to map boxes from 600x600 back to original frame size
     scale_x = orig_w / INPUT_SIZE[0]
     scale_y = orig_h / INPUT_SIZE[1]
     
     detections = []
-    for i in range(keep.sum().item()):
-        idx = torch.where(keep)[0][i]
+    # Only take the BEST detection (highest confidence)
+    for i in range(min(1, len(sorted_order))):
+        idx = kept_indices[sorted_order[i]]
         box = pred["boxes"][idx].cpu().numpy()
         label = pred["labels"][idx].item()
         score = pred["scores"][idx].item()
         
         # Scale box coordinates back to original frame size
-        scaled_box = [
-            box[0] * scale_x,  # x1
-            box[1] * scale_y,  # y1
-            box[2] * scale_x,  # x2
-            box[3] * scale_y,  # y2
-        ]
+        x1 = max(0, int(box[0] * scale_x))
+        y1 = max(0, int(box[1] * scale_y))
+        x2 = min(orig_w, int(box[2] * scale_x))
+        y2 = min(orig_h, int(box[3] * scale_y))
+        
+        # Skip invalid boxes (too small or inverted)
+        if x2 - x1 < 10 or y2 - y1 < 10:
+            continue
         
         detection = {
-            "box": scaled_box,
+            "box": [x1, y1, x2, y2],
             "label": label,
             "class_name": IDX_TO_CLASS.get(label, f"Class {label}"),
             "score": score
         }
         detections.append(detection)
-        
-        # Limit to top 1 detection (single hand ASL)
-        if len(detections) >= 1:
-            break
+        print(f"[DETECTION] {detection['class_name']} ({score:.2f}) at [{x1},{y1},{x2},{y2}]")
     
     return detections
 
@@ -224,37 +232,48 @@ def draw_detections(
         Annotated frame
     """
     annotated = frame.copy()
+    height, width = annotated.shape[:2]
     
     for det in detections:
-        x1, y1, x2, y2 = map(int, det["box"])
+        x1, y1, x2, y2 = det["box"]  # Already integers from run_inference
         class_name = det["class_name"]
         score = det["score"]
         
-        # Draw box
-        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+        # Ensure coordinates are within frame bounds
+        x1 = max(0, min(x1, width - 1))
+        y1 = max(0, min(y1, height - 1))
+        x2 = max(0, min(x2, width - 1))
+        y2 = max(0, min(y2, height - 1))
         
-        # Draw label background
-        label_text = f"{class_name}: {score:.2f}"
+        # Draw thick box (bright green)
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 3)
+        
+        # Draw label
+        label_text = f"{class_name}: {score:.0%}"
         (text_width, text_height), baseline = cv2.getTextSize(
-            label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
+            label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2
         )
         
+        # Position label - above box if room, else inside top of box
+        label_y = y1 - 10 if y1 > text_height + 15 else y1 + text_height + 10
+        
+        # Draw label background
         cv2.rectangle(
             annotated,
-            (x1, y1 - text_height - 10),
-            (x1 + text_width + 5, y1),
-            color,
+            (x1, label_y - text_height - 5),
+            (x1 + text_width + 10, label_y + 5),
+            (0, 255, 0),
             -1  # Filled
         )
         
-        # Draw label text
+        # Draw label text (black on green)
         cv2.putText(
             annotated,
             label_text,
-            (x1 + 2, y1 - 5),
+            (x1 + 5, label_y),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 0, 0),  # Black text
+            0.9,
+            (0, 0, 0),
             2
         )
     
