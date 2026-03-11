@@ -200,8 +200,8 @@ def run_inference(
         }
         detections.append(detection)
         
-        # Limit to top 5 detections to avoid clutter
-        if len(detections) >= 5:
+        # Limit to top 1 detection (single hand ASL)
+        if len(detections) >= 1:
             break
     
     return detections
